@@ -1,6 +1,6 @@
 import discord
 from discord import app_commands
-import os["TOKEN"]
+import os
 
 TOKEN = os.environ["TOKEN"]
 
