@@ -4,7 +4,7 @@ import os
 
 TOKEN = os.environ["TOKEN"]
 
-# ⚠️ ВСТАВЬ ID СВОЕГО СЕРВЕРА
+# ⚠️ ВСТАВЬ ID СВОЕГО СЕРВЕРА СЮДА
 GUILD_ID = 1431313547014701136
 
 intents = discord.Intents.default()
@@ -23,9 +23,9 @@ async def on_ready():
     try:
         await tree.sync(guild=guild)
         print("Slash commands synced (guild)")
-    except:
+    except Exception as e:
+        print("Guild sync failed, using global sync:", e)
         await tree.sync()
-        print("Slash commands synced (global)")
 
     print(f"Logged in as {client.user}")
 
@@ -35,7 +35,7 @@ async def on_ready():
 @tree.command(name="help", description="Показать команды")
 async def help_cmd(interaction: discord.Interaction):
     await interaction.response.send_message(
-        "/help /ban /mute /warn"
+        "Команды: /help /ban /mute /warn"
     )
 
 # =====================
@@ -50,7 +50,7 @@ async def ban(interaction: discord.Interaction, member: discord.Member, reason: 
 # =====================
 # /mute (timeout)
 # =====================
-@tree.command(name="mute", description="Замутить пользователя (10 минут)")
+@tree.command(name="mute", description="Замутить пользователя на 10 минут")
 @app_commands.default_permissions(moderate_members=True)
 async def mute(interaction: discord.Interaction, member: discord.Member, reason: str = "Без причины"):
     await member.timeout(duration=600, reason=reason)
@@ -61,7 +61,7 @@ async def mute(interaction: discord.Interaction, member: discord.Member, reason:
 # =====================
 warns = {}
 
-@tree.command(name="warn", description="Выдать варн")
+@tree.command(name="warn", description="Выдать предупреждение")
 async def warn(interaction: discord.Interaction, member: discord.Member, reason: str = "Без причины"):
     if member.id not in warns:
         warns[member.id] = 0
