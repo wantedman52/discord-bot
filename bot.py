@@ -7,7 +7,7 @@ import json
 TOKEN = os.getenv("TOKEN")
 
 GUILD_ID = 1431313547014701136
-LOG_CHANNEL_ID = 0  # <-- 1515646304166875166
+LOG_CHANNEL_ID = 0  # <-- ВСТАВЬ ID КАНАЛА ЛОГОВ
 
 intents = discord.Intents.default()
 intents.members = True
@@ -16,7 +16,7 @@ client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
 # =====================
-# WARNS FILE SYSTEM
+# WARN SYSTEM
 # =====================
 WARN_FILE = "warns.json"
 
@@ -39,6 +39,7 @@ warns = load_warns()
 async def send_log(text: str):
     if LOG_CHANNEL_ID == 0:
         return
+
     channel = client.get_channel(LOG_CHANNEL_ID)
     if channel:
         await channel.send(text)
@@ -94,7 +95,7 @@ async def help_cmd(interaction: discord.Interaction):
     )
 
 # =====================
-# MUTE
+# MUTE (FIXED + SAFE)
 # =====================
 @tree.command(name="mute", description="Мут с временем", guild=discord.Object(id=GUILD_ID))
 @app_commands.default_permissions(moderate_members=True)
@@ -141,30 +142,34 @@ async def ban(interaction: discord.Interaction, member: discord.Member, reason: 
     await send_log(f"🔨 BAN: {member} | {reason}")
 
 # =====================
-# UNBAN
+# UNBAN (FIXED SAFE)
 # =====================
 @tree.command(name="unban", description="Разбан", guild=discord.Object(id=GUILD_ID))
 @app_commands.default_permissions(ban_members=True)
 async def unban(interaction: discord.Interaction, user_id: str):
 
+    await interaction.response.defer()
+
     user = await client.fetch_user(int(user_id))
     await interaction.guild.unban(user)
 
-    await interaction.response.send_message(f"✅ Разбанен {user}")
+    await interaction.followup.send(f"✅ Разбанен {user}")
 
     await send_log(f"🔓 UNBAN: {user}")
 
 # =====================
-# WARN SYSTEM
+# WARN (FIXED NO TIMEOUT BUG)
 # =====================
 @tree.command(name="warn", description="Варн", guild=discord.Object(id=GUILD_ID))
 async def warn(interaction: discord.Interaction, member: discord.Member, reason: str = "Без причины"):
+
+    await interaction.response.defer()
 
     warns.setdefault(str(member.id), 0)
     warns[str(member.id)] += 1
     save_warns(warns)
 
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"⚠️ {member.mention} варн ({warns[str(member.id)]})"
     )
 
