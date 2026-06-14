@@ -7,11 +7,15 @@ TOKEN = os.getenv("TOKEN")
 
 GUILD_ID = 1431313547014701136
 
-# 👉 сюда вставишь ID канала логов
+# 👉 ВСТАВЬ СЮДА ID ЛОГ КАНАЛА
 LOG_CHANNEL_ID = 1515646304166875166
+
+# 👉 ВСТАВЬ СЮДА ID РОЛИ "Игрок"
+ROLE_ID = 1431319452829618326
 
 intents = discord.Intents.default()
 intents.members = True
+intents.message_content = True
 
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
@@ -34,13 +38,12 @@ def parse_time(time_str: str):
             return num * 3600
         elif unit == "d":
             return num * 86400
-        else:
-            return None
+        return None
     except:
         return None
 
 # =====================
-# LOG SYSTEM
+# LOGS
 # =====================
 async def send_log(guild, text):
     if LOG_CHANNEL_ID == 0:
@@ -66,12 +69,26 @@ async def on_ready():
     print(f"Logged in as {client.user}")
 
 # =====================
+# AUTO ROLE
+# =====================
+@client.event
+async def on_member_join(member: discord.Member):
+    role = member.guild.get_role(ROLE_ID)
+
+    if role:
+        await member.add_roles(role)
+
+        await send_log(member.guild,
+            f"👋 JOIN | {member} получил роль {role.name}"
+        )
+
+# =====================
 # HELP
 # =====================
 @tree.command(name="help", description="Команды", guild=discord.Object(id=GUILD_ID))
 async def help_cmd(interaction: discord.Interaction):
     await interaction.response.send_message(
-        "/ban /unban /mute /unmute /warn",
+        "/ban /unban /mute /unmute /warn /clear",
         ephemeral=True
     )
 
@@ -150,6 +167,19 @@ async def warn(interaction: discord.Interaction, member: discord.Member, reason:
 
     await send_log(interaction.guild,
         f"⚠️ WARN | {member} | by {interaction.user} | {reason} | total {warns[member.id]}"
+    )
+
+# =====================
+# CLEAR CHAT
+# =====================
+@tree.command(name="clear", description="Очистка чата", guild=discord.Object(id=GUILD_ID))
+@app_commands.default_permissions(manage_messages=True)
+async def clear(interaction: discord.Interaction, amount: int):
+    await interaction.channel.purge(limit=amount)
+
+    await interaction.response.send_message(
+        f"🧹 Удалено {amount} сообщений",
+        ephemeral=True
     )
 
 client.run(TOKEN)
