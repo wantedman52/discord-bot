@@ -1,14 +1,13 @@
 import discord
 from discord import app_commands
 import os
-import asyncio
 import datetime
 import json
 
 TOKEN = os.getenv("TOKEN")
 
 GUILD_ID = 1431313547014701136
-LOG_CHANNEL_ID = 0  # <-- ВСТАВЬ ID ЛОГ-КАНАЛА
+LOG_CHANNEL_ID = 0  # <-- сюда ID канала логов
 
 intents = discord.Intents.default()
 intents.members = True
@@ -17,7 +16,7 @@ client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
 # =====================
-# WARNS SYSTEM (FILE)
+# WARNS FILE SYSTEM
 # =====================
 WARN_FILE = "warns.json"
 
@@ -35,7 +34,7 @@ def save_warns(data):
 warns = load_warns()
 
 # =====================
-# LOGS
+# LOG SYSTEM
 # =====================
 async def send_log(text: str):
     if LOG_CHANNEL_ID == 0:
@@ -45,12 +44,16 @@ async def send_log(text: str):
         await channel.send(text)
 
 # =====================
-# TIME PARSER
+# TIME PARSER (FIXED)
 # =====================
 def parse_time(time_str: str):
     try:
+        time_str = time_str.lower().strip()
+
         unit = time_str[-1]
-        value = int(time_str[:-1])
+        value_part = time_str[:-1].strip()
+
+        value = int(value_part)
 
         if unit == "s":
             return value
@@ -60,6 +63,7 @@ def parse_time(time_str: str):
             return value * 3600
         if unit == "d":
             return value * 86400
+
     except:
         return None
 
@@ -85,7 +89,9 @@ async def on_ready():
 # =====================
 @tree.command(name="help", description="Команды", guild=discord.Object(id=GUILD_ID))
 async def help_cmd(interaction: discord.Interaction):
-    await interaction.response.send_message("/help /ban /mute /warn /unban /unmute")
+    await interaction.response.send_message(
+        "/help /mute /ban /warn /unmute /unban"
+    )
 
 # =====================
 # MUTE
@@ -149,7 +155,7 @@ async def unban(interaction: discord.Interaction, user_id: str):
     await send_log(f"🔓 UNBAN: {user}")
 
 # =====================
-# WARN
+# WARN SYSTEM
 # =====================
 @tree.command(name="warn", description="Варн", guild=discord.Object(id=GUILD_ID))
 async def warn(interaction: discord.Interaction, member: discord.Member, reason: str = "Без причины"):
@@ -165,6 +171,6 @@ async def warn(interaction: discord.Interaction, member: discord.Member, reason:
     await send_log(f"⚠️ WARN: {member} | {reason}")
 
 # =====================
-# RUN
+# RUN BOT
 # =====================
 client.run(TOKEN)
