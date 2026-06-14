@@ -7,7 +7,7 @@ import json
 TOKEN = os.getenv("TOKEN")
 
 GUILD_ID = 1431313547014701136
-LOG_CHANNEL_ID = 0  # <- вставь ID канала логов
+LOG_CHANNEL_ID = 0
 
 intents = discord.Intents.default()
 intents.members = True
@@ -16,9 +16,11 @@ client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
 # =====================
-# PERMISSION CHECK (FIX FOR YOUR VERSION)
+# CHECK: SERVER ONLY + ADMIN ONLY
 # =====================
-def is_admin(interaction: discord.Interaction):
+def check(interaction: discord.Interaction):
+    if interaction.guild is None:
+        return False
     return interaction.user.guild_permissions.administrator
 
 # =====================
@@ -40,7 +42,7 @@ def save_warns(data):
 warns = load_warns()
 
 # =====================
-# LOG SYSTEM
+# LOGS
 # =====================
 async def send_log(text: str):
     if LOG_CHANNEL_ID == 0:
@@ -87,13 +89,13 @@ async def on_ready():
     print(f"Logged in as {client.user}")
 
 # =====================
-# HELP
+# HELP (SERVER ONLY)
 # =====================
 @tree.command(name="help", description="Команды", guild=discord.Object(id=GUILD_ID))
 async def help_cmd(interaction: discord.Interaction):
 
-    if not is_admin(interaction):
-        return await interaction.response.send_message("❌ Нет прав", ephemeral=True)
+    if not check(interaction):
+        return await interaction.response.send_message("❌ Только админы и только сервер", ephemeral=True)
 
     await interaction.response.send_message(
         "/mute /ban /warn /unmute /unban",
@@ -101,12 +103,12 @@ async def help_cmd(interaction: discord.Interaction):
     )
 
 # =====================
-# MUTE
+# MUTE (NO DM + FIXED)
 # =====================
-@tree.command(name="mute", description="Мут с временем", guild=discord.Object(id=GUILD_ID))
+@tree.command(name="mute", description="Мут", guild=discord.Object(id=GUILD_ID))
 async def mute(interaction: discord.Interaction, member: discord.Member, time: str, reason: str = "Без причины"):
 
-    if not is_admin(interaction):
+    if not check(interaction):
         return await interaction.response.send_message("❌ Нет прав", ephemeral=True)
 
     seconds = parse_time(time)
@@ -131,7 +133,7 @@ async def mute(interaction: discord.Interaction, member: discord.Member, time: s
 @tree.command(name="unmute", description="Снять мут", guild=discord.Object(id=GUILD_ID))
 async def unmute(interaction: discord.Interaction, member: discord.Member):
 
-    if not is_admin(interaction):
+    if not check(interaction):
         return await interaction.response.send_message("❌ Нет прав", ephemeral=True)
 
     await member.timeout(None)
@@ -146,7 +148,7 @@ async def unmute(interaction: discord.Interaction, member: discord.Member):
 @tree.command(name="ban", description="Бан", guild=discord.Object(id=GUILD_ID))
 async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "Без причины"):
 
-    if not is_admin(interaction):
+    if not check(interaction):
         return await interaction.response.send_message("❌ Нет прав", ephemeral=True)
 
     await member.ban(reason=reason)
@@ -164,7 +166,7 @@ async def ban(interaction: discord.Interaction, member: discord.Member, reason: 
 @tree.command(name="unban", description="Разбан", guild=discord.Object(id=GUILD_ID))
 async def unban(interaction: discord.Interaction, user_id: str):
 
-    if not is_admin(interaction):
+    if not check(interaction):
         return await interaction.response.send_message("❌ Нет прав", ephemeral=True)
 
     user = await client.fetch_user(int(user_id))
@@ -180,7 +182,7 @@ async def unban(interaction: discord.Interaction, user_id: str):
 @tree.command(name="warn", description="Варн", guild=discord.Object(id=GUILD_ID))
 async def warn(interaction: discord.Interaction, member: discord.Member, reason: str = "Без причины"):
 
-    if not is_admin(interaction):
+    if not check(interaction):
         return await interaction.response.send_message("❌ Нет прав", ephemeral=True)
 
     warns.setdefault(str(member.id), 0)
@@ -195,6 +197,6 @@ async def warn(interaction: discord.Interaction, member: discord.Member, reason:
     await send_log(f"⚠️ WARN: {member} | {reason}")
 
 # =====================
-# RUN BOT
+# RUN
 # =====================
 client.run(TOKEN)
