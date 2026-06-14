@@ -7,7 +7,7 @@ import json
 TOKEN = os.getenv("TOKEN")
 
 GUILD_ID = 1431313547014701136
-LOG_CHANNEL_ID = 1515646304166875166  # <-- ВСТАВЬ ID КАНАЛА ЛОГОВ
+LOG_CHANNEL_ID = 0  # <- вставь ID канала логов
 
 intents = discord.Intents.default()
 intents.members = True
@@ -16,7 +16,7 @@ client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
 # =====================
-# WARN SYSTEM
+# WARNS SYSTEM
 # =====================
 WARN_FILE = "warns.json"
 
@@ -34,27 +34,23 @@ def save_warns(data):
 warns = load_warns()
 
 # =====================
-# LOG SYSTEM
+# LOGS
 # =====================
 async def send_log(text: str):
     if LOG_CHANNEL_ID == 0:
         return
-
     channel = client.get_channel(LOG_CHANNEL_ID)
     if channel:
         await channel.send(text)
 
 # =====================
-# TIME PARSER (FIXED)
+# TIME PARSER
 # =====================
 def parse_time(time_str: str):
     try:
         time_str = time_str.lower().strip()
-
         unit = time_str[-1]
-        value_part = time_str[:-1].strip()
-
-        value = int(value_part)
+        value = int(time_str[:-1])
 
         if unit == "s":
             return value
@@ -64,7 +60,6 @@ def parse_time(time_str: str):
             return value * 3600
         if unit == "d":
             return value * 86400
-
     except:
         return None
 
@@ -86,96 +81,133 @@ async def on_ready():
     print(f"Logged in as {client.user}")
 
 # =====================
-# HELP
+# HELP (VISIBLE ONLY ADMINS)
 # =====================
-@tree.command(name="help", description="Команды", guild=discord.Object(id=GUILD_ID))
+@tree.command(
+    name="help",
+    description="Команды",
+    guild=discord.Object(id=GUILD_ID),
+    default_member_permissions=discord.Permissions(administrator=True)
+)
 async def help_cmd(interaction: discord.Interaction):
     await interaction.response.send_message(
-        "/help /mute /ban /warn /unmute /unban"
+        "/mute /ban /warn /unmute /unban",
+        ephemeral=True
     )
 
 # =====================
-# MUTE (FIXED + SAFE)
+# MUTE (ADMIN ONLY)
 # =====================
-@tree.command(name="mute", description="Мут с временем", guild=discord.Object(id=GUILD_ID))
-@app_commands.default_permissions(moderate_members=True)
+@tree.command(
+    name="mute",
+    description="Мут с временем",
+    guild=discord.Object(id=GUILD_ID),
+    default_member_permissions=discord.Permissions(administrator=True)
+)
 async def mute(interaction: discord.Interaction, member: discord.Member, time: str, reason: str = "Без причины"):
 
     seconds = parse_time(time)
 
     if not seconds:
-        await interaction.response.send_message("❌ Формат: 10m / 1h / 1d")
+        await interaction.response.send_message("❌ Формат: 10m / 1h / 1d", ephemeral=True)
         return
 
     until = discord.utils.utcnow() + datetime.timedelta(seconds=seconds)
 
     await member.timeout(until, reason=reason)
 
-    await interaction.response.send_message(f"🔇 {member.mention} мут на {time}")
+    await interaction.response.send_message(
+        f"🔇 {member} замучен на {time}",
+        ephemeral=True
+    )
 
     await send_log(f"🔇 MUTE: {member} | {time} | {reason}")
 
 # =====================
 # UNMUTE
 # =====================
-@tree.command(name="unmute", description="Снять мут", guild=discord.Object(id=GUILD_ID))
-@app_commands.default_permissions(moderate_members=True)
+@tree.command(
+    name="unmute",
+    description="Снять мут",
+    guild=discord.Object(id=GUILD_ID),
+    default_member_permissions=discord.Permissions(administrator=True)
+)
 async def unmute(interaction: discord.Interaction, member: discord.Member):
 
     await member.timeout(None)
 
-    await interaction.response.send_message(f"🔊 Размучен {member}")
+    await interaction.response.send_message(
+        f"🔊 Размучен {member}",
+        ephemeral=True
+    )
 
     await send_log(f"🔊 UNMUTE: {member}")
 
 # =====================
 # BAN
 # =====================
-@tree.command(name="ban", description="Бан", guild=discord.Object(id=GUILD_ID))
-@app_commands.default_permissions(ban_members=True)
+@tree.command(
+    name="ban",
+    description="Бан",
+    guild=discord.Object(id=GUILD_ID),
+    default_member_permissions=discord.Permissions(administrator=True)
+)
 async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "Без причины"):
 
     await member.ban(reason=reason)
 
-    await interaction.response.send_message(f"🔨 {member} забанен")
+    await interaction.response.send_message(
+        f"🔨 {member} забанен",
+        ephemeral=True
+    )
 
     await send_log(f"🔨 BAN: {member} | {reason}")
 
 # =====================
-# UNBAN (FIXED SAFE)
+# UNBAN
 # =====================
-@tree.command(name="unban", description="Разбан", guild=discord.Object(id=GUILD_ID))
-@app_commands.default_permissions(ban_members=True)
+@tree.command(
+    name="unban",
+    description="Разбан",
+    guild=discord.Object(id=GUILD_ID),
+    default_member_permissions=discord.Permissions(administrator=True)
+)
 async def unban(interaction: discord.Interaction, user_id: str):
-
-    await interaction.response.defer()
 
     user = await client.fetch_user(int(user_id))
     await interaction.guild.unban(user)
 
-    await interaction.followup.send(f"✅ Разбанен {user}")
+    await interaction.response.send_message(
+        f"✅ Разбанен {user}",
+        ephemeral=True
+    )
 
     await send_log(f"🔓 UNBAN: {user}")
 
 # =====================
-# WARN (FIXED NO TIMEOUT BUG)
+# WARN
 # =====================
-@tree.command(name="warn", description="Варн", guild=discord.Object(id=GUILD_ID))
+@tree.command(
+    name="warn",
+    description="Варн",
+    guild=discord.Object(id=GUILD_ID),
+    default_member_permissions=discord.Permissions(administrator=True)
+)
 async def warn(interaction: discord.Interaction, member: discord.Member, reason: str = "Без причины"):
 
-    await interaction.response.defer()
+    await interaction.response.defer(ephemeral=True)
 
     warns.setdefault(str(member.id), 0)
     warns[str(member.id)] += 1
     save_warns(warns)
 
     await interaction.followup.send(
-        f"⚠️ {member.mention} варн ({warns[str(member.id)]})"
+        f"⚠️ {member} варн ({warns[str(member.id)]})"
     )
 
     await send_log(f"⚠️ WARN: {member} | {reason}")
 
 # =====================
-# RUN BOT
+# RUN
 # =====================
 client.run(TOKEN)
