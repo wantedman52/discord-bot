@@ -3,7 +3,7 @@ from discord import app_commands
 import os
 
 TOKEN = os.getenv("TOKEN")
-print("TOKEN =", TOKEN)
+
 
 # ⚠️ ВСТАВЬ ID СВОЕГО СЕРВЕРА СЮДА
 GUILD_ID = 1431313547014701136
