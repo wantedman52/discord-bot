@@ -8,7 +8,7 @@ TOKEN = os.getenv("TOKEN")
 GUILD_ID = 1431313547014701136
 
 # 👉 ВСТАВЬ ID КАНАЛА ДЛЯ ЛОГОВ
-LOG_CHANNEL_ID = 1431313547014701136  # <-- поменяешь на свой
+LOG_CHANNEL_ID = 1515646304166875166  # <-- поменяешь на свой
 
 intents = discord.Intents.default()
 intents.members = True
