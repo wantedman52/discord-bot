@@ -6,7 +6,7 @@ import datetime
 TOKEN = os.getenv("TOKEN")
 
 GUILD_ID = 1431313547014701136
-LOG_CHANNEL_ID = 1515646304166875166  # поставь ID канала логов
+LOG_CHANNEL_ID = 1515646304166875166 # <-- вставь ID канала логов сюда
 
 intents = discord.Intents.default()
 intents.members = True
@@ -41,9 +41,9 @@ def parse_time(t: str):
         return None
 
 # =====================
-# LOGS
+# LOG SYSTEM
 # =====================
-async def log(text: str):
+async def send_log(text: str):
     if LOG_CHANNEL_ID == 0:
         return
     channel = client.get_channel(LOG_CHANNEL_ID)
@@ -51,17 +51,17 @@ async def log(text: str):
         await channel.send(text)
 
 # =====================
-# READY (FIX SYNC)
+# READY (НЕ ЛОМАЕМ КОМАНДЫ)
 # =====================
 @client.event
 async def on_ready():
     guild = discord.Object(id=GUILD_ID)
 
-    tree.clear_commands(guild=guild)
+    # ❗ ТОЛЬКО синк, без удаления команд
     await tree.sync(guild=guild)
 
     print(f"Logged in as {client.user}")
-    print("Guild commands synced clean")
+    print("Guild commands synced")
 
 # =====================
 # HELP
@@ -69,9 +69,38 @@ async def on_ready():
 @tree.command(name="help", description="Команды", guild=discord.Object(id=GUILD_ID))
 async def help_cmd(interaction: discord.Interaction):
     await interaction.response.send_message(
-        "/mute /unmute /ban /unban /warn",
+        "/ban /unban /mute /unmute /warn",
         ephemeral=True
     )
+
+# =====================
+# BAN
+# =====================
+@tree.command(name="ban", description="Бан", guild=discord.Object(id=GUILD_ID))
+async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "Без причины"):
+
+    if not is_admin(interaction):
+        return await interaction.response.send_message("❌ Нет прав", ephemeral=True)
+
+    await member.ban(reason=reason)
+
+    await interaction.response.send_message("🔨 Забанен", ephemeral=True)
+    await send_log(f"🔨 BAN {member} | {reason}")
+
+# =====================
+# UNBAN
+# =====================
+@tree.command(name="unban", description="Разбан", guild=discord.Object(id=GUILD_ID))
+async def unban(interaction: discord.Interaction, user_id: str):
+
+    if not is_admin(interaction):
+        return await interaction.response.send_message("❌ Нет прав", ephemeral=True)
+
+    user = await client.fetch_user(int(user_id))
+    await interaction.guild.unban(user)
+
+    await interaction.response.send_message("✅ Разбанен", ephemeral=True)
+    await send_log(f"🔓 UNBAN {user}")
 
 # =====================
 # MUTE
@@ -90,8 +119,7 @@ async def mute(interaction: discord.Interaction, member: discord.Member, time: s
     await member.timeout(until)
 
     await interaction.response.send_message("🔇 Замучен", ephemeral=True)
-
-    await log(f"🔇 MUTE {member} на {time}")
+    await send_log(f"🔇 MUTE {member} | {time}")
 
 # =====================
 # UNMUTE
@@ -105,39 +133,7 @@ async def unmute(interaction: discord.Interaction, member: discord.Member):
     await member.timeout(None)
 
     await interaction.response.send_message("🔊 Размучен", ephemeral=True)
-
-    await log(f"🔊 UNMUTE {member}")
-
-# =====================
-# BAN
-# =====================
-@tree.command(name="ban", description="Бан", guild=discord.Object(id=GUILD_ID))
-async def ban(interaction: discord.Interaction, member: discord.Member):
-
-    if not is_admin(interaction):
-        return await interaction.response.send_message("❌ Нет прав", ephemeral=True)
-
-    await member.ban()
-
-    await interaction.response.send_message("🔨 Забанен", ephemeral=True)
-
-    await log(f"🔨 BAN {member}")
-
-# =====================
-# UNBAN
-# =====================
-@tree.command(name="unban", description="Разбан", guild=discord.Object(id=GUILD_ID))
-async def unban(interaction: discord.Interaction, user_id: str):
-
-    if not is_admin(interaction):
-        return await interaction.response.send_message("❌ Нет прав", ephemeral=True)
-
-    user = await client.fetch_user(int(user_id))
-    await interaction.guild.unban(user)
-
-    await interaction.response.send_message("✅ Разбанен", ephemeral=True)
-
-    await log(f"🔓 UNBAN {user}")
+    await send_log(f"🔊 UNMUTE {member}")
 
 # =====================
 # WARN
@@ -145,7 +141,7 @@ async def unban(interaction: discord.Interaction, user_id: str):
 warns = {}
 
 @tree.command(name="warn", description="Варн", guild=discord.Object(id=GUILD_ID))
-async def warn(interaction: discord.Interaction, member: discord.Member):
+async def warn(interaction: discord.Interaction, member: discord.Member, reason: str = "Без причины"):
 
     if not is_admin(interaction):
         return await interaction.response.send_message("❌ Нет прав", ephemeral=True)
@@ -157,7 +153,7 @@ async def warn(interaction: discord.Interaction, member: discord.Member):
         ephemeral=True
     )
 
-    await log(f"⚠️ WARN {member} ({warns[str(member.id)]})")
+    await send_log(f"⚠️ WARN {member} ({warns[str(member.id)]}) | {reason}")
 
 # =====================
 # RUN
