@@ -15,28 +15,10 @@ client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
 # =====================
-# CHECK ADMIN
+# ADMIN CHECK
 # =====================
 def is_admin(interaction: discord.Interaction):
     return interaction.guild is not None and interaction.user.guild_permissions.administrator
-
-# =====================
-# WARN SYSTEM
-# =====================
-WARN_FILE = "warns.json"
-
-def load_warns():
-    try:
-        with open(WARN_FILE, "r") as f:
-            return json.load(f)
-    except:
-        return {}
-
-def save_warns(data):
-    with open(WARN_FILE, "w") as f:
-        json.dump(data, f)
-
-warns = load_warns()
 
 # =====================
 # TIME PARSER
@@ -59,45 +41,46 @@ def parse_time(time_str: str):
         return None
 
 # =====================
-# READY + GUILD SYNC (IMPORTANT)
+# CLEAR OLD GLOBAL COMMANDS + SYNC ONLY GUILD
 # =====================
 @client.event
 async def on_ready():
     guild = discord.Object(id=GUILD_ID)
 
-    tree.clear_commands(guild=guild)
-    await tree.sync(guild=guild)
+    try:
+        # ❗ ВАЖНО: удаляем ВСЕ старые глобальные команды
+        tree.clear_commands()
+
+        # синк только на сервер
+        await tree.sync(guild=guild)
+
+        print("✅ Old global commands removed")
+        print("✅ Guild commands synced")
+
+    except Exception as e:
+        print("Sync error:", e)
 
     print(f"Logged in as {client.user}")
-    print("Guild-only commands synced (NO DM COMMANDS)")
 
 # =====================
-# HELP (VISIBLE IN DM + SERVER)
+# HELP (ONLY GUILD BUT CAN BE SEEN ANYWHERE IF OPENED)
 # =====================
-@tree.command(
-    name="help",
-    description="Показать команды",
-    guild=discord.Object(id=GUILD_ID)
-)
+@tree.command(name="help", description="Команды", guild=discord.Object(id=GUILD_ID))
 async def help_cmd(interaction: discord.Interaction):
 
     await interaction.response.send_message(
-        "📌 Команды:\n/help (везде)\n/mute /ban /warn (только сервер)",
+        "📌 /mute /ban /warn /unmute /unban",
         ephemeral=True
     )
 
 # =====================
-# MUTE (SERVER ONLY)
+# MUTE
 # =====================
-@tree.command(
-    name="mute",
-    description="Мут пользователя",
-    guild=discord.Object(id=GUILD_ID)
-)
+@tree.command(name="mute", description="Мут", guild=discord.Object(id=GUILD_ID))
 async def mute(interaction: discord.Interaction, member: discord.Member, time: str, reason: str = "Без причины"):
 
     if not is_admin(interaction):
-        return await interaction.response.send_message("❌ Только админы и только сервер", ephemeral=True)
+        return await interaction.response.send_message("❌ Нет прав", ephemeral=True)
 
     seconds = parse_time(time)
 
@@ -108,54 +91,35 @@ async def mute(interaction: discord.Interaction, member: discord.Member, time: s
 
     await member.timeout(until, reason=reason)
 
-    await interaction.response.send_message(
-        f"🔇 {member} мут на {time}",
-        ephemeral=True
-    )
+    await interaction.response.send_message(f"🔇 {member} мут на {time}", ephemeral=True)
+
+# =====================
+# UNMUTE
+# =====================
+@tree.command(name="unmute", description="Снять мут", guild=discord.Object(id=GUILD_ID))
+async def unmute(interaction: discord.Interaction, member: discord.Member):
+
+    if not is_admin(interaction):
+        return await interaction.response.send_message("❌ Нет прав", ephemeral=True)
+
+    await member.timeout(None)
+
+    await interaction.response.send_message("🔊 Размучен", ephemeral=True)
 
 # =====================
 # BAN
 # =====================
-@tree.command(
-    name="ban",
-    description="Бан пользователя",
-    guild=discord.Object(id=GUILD_ID)
-)
+@tree.command(name="ban", description="Бан", guild=discord.Object(id=GUILD_ID))
 async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "Без причины"):
 
     if not is_admin(interaction):
-        return await interaction.response.send_message("❌ Только админы и только сервер", ephemeral=True)
+        return await interaction.response.send_message("❌ Нет прав", ephemeral=True)
 
     await member.ban(reason=reason)
 
-    await interaction.response.send_message(
-        f"🔨 {member} забанен",
-        ephemeral=True
-    )
+    await interaction.response.send_message(f"🔨 {member} забанен", ephemeral=True)
 
 # =====================
-# WARN
-# =====================
-@tree.command(
-    name="warn",
-    description="Варн",
-    guild=discord.Object(id=GUILD_ID)
-)
-async def warn(interaction: discord.Interaction, member: discord.Member, reason: str = "Без причины"):
-
-    if not is_admin(interaction):
-        return await interaction.response.send_message("❌ Только админы и только сервер", ephemeral=True)
-
-    warns.setdefault(str(member.id), 0)
-    warns[str(member.id)] += 1
-    save_warns(warns)
-
-    await interaction.response.send_message(
-        f"⚠️ {member} варн ({warns[str(member.id)]})",
-        ephemeral=True
-    )
-
-# =====================
-# RUN BOT
+# RUN
 # =====================
 client.run(TOKEN)
