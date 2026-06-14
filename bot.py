@@ -7,7 +7,7 @@ import json
 TOKEN = os.getenv("TOKEN")
 
 GUILD_ID = 1431313547014701136
-LOG_CHANNEL_ID = 0  # <-- сюда ID канала логов
+LOG_CHANNEL_ID = 0  # <-- 1515646304166875166
 
 intents = discord.Intents.default()
 intents.members = True
