@@ -10,11 +10,10 @@ import time
 # TOKEN
 # =====================
 TOKEN = os.getenv("TOKEN")
-
 GUILD_ID = 1431313547014701136
 
 # =====================
-# ROLES / CHANNELS
+# IDS
 # =====================
 RU_ROLE_ID = 1515772029893218445
 EN_ROLE_ID = 1515771862464991413
@@ -22,11 +21,13 @@ EN_ROLE_ID = 1515771862464991413
 RU_RULES_CHANNEL_ID = 1431321162721525884
 EN_RULES_CHANNEL_ID = 1510594864226500618
 
+# 🔥 ГЛОБАЛ ЛОГ
 LOG_CHANNEL_ID = 1515646304166875166
 
-# TICKETS
+# 🎫 ТИКЕТ ЛОГ ОТДЕЛЬНО
+TICKET_LOG_CHANNEL_ID = 1515646304166875166
 TICKET_CATEGORY_ID = 1515775223243345971
-TICKET_LOG_CHANNEL_ID = 1515775278087934106
+
 STAFF_ROLE_ID = 1431682224498933802
 
 # =====================
@@ -40,20 +41,20 @@ client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
 # =====================
-# ANTIFLOOD
-# =====================
-spam = defaultdict(list)
-
-# =====================
-# SIMPLE LOG
+# LOG FUNCTION
 # =====================
 async def log(guild, text):
     ch = guild.get_channel(LOG_CHANNEL_ID)
     if ch:
         await ch.send(f"📌 {text}")
 
+async def ticket_log(guild, text):
+    ch = guild.get_channel(TICKET_LOG_CHANNEL_ID)
+    if ch:
+        await ch.send(f"🎫 {text}")
+
 # =====================
-# DATABASE (можно расширить позже)
+# DATABASE (STATS)
 # =====================
 conn = sqlite3.connect("moderation.db")
 cursor = conn.cursor()
@@ -68,36 +69,36 @@ CREATE TABLE IF NOT EXISTS users (
 """)
 conn.commit()
 
-def add_user(uid):
+def ensure(uid):
     cursor.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (uid,))
     conn.commit()
 
 def add_warn(uid):
-    add_user(uid)
+    ensure(uid)
     cursor.execute("UPDATE users SET warns = warns + 1 WHERE user_id = ?", (uid,))
     conn.commit()
 
 def add_ban(uid):
-    add_user(uid)
+    ensure(uid)
     cursor.execute("UPDATE users SET bans = bans + 1 WHERE user_id = ?", (uid,))
     conn.commit()
 
 def add_mute(uid):
-    add_user(uid)
+    ensure(uid)
     cursor.execute("UPDATE users SET mutes = mutes + 1 WHERE user_id = ?", (uid,))
     conn.commit()
 
 def get_stats(uid):
-    add_user(uid)
+    ensure(uid)
     cursor.execute("SELECT warns, bans, mutes FROM users WHERE user_id = ?", (uid,))
     return cursor.fetchone()
 
 # =====================
-# RULES VIEW (ТВОЙ КОД + УЛУЧШЕНИЕ)
+# RULES
 # =====================
 class RulesView(discord.ui.View):
 
-    @discord.ui.button(label="🇷🇺 Русский", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="🇷🇺 RU", style=discord.ButtonStyle.primary)
     async def ru(self, interaction: discord.Interaction, button: discord.ui.Button):
 
         role = interaction.guild.get_role(RU_ROLE_ID)
@@ -105,11 +106,11 @@ class RulesView(discord.ui.View):
             await interaction.user.add_roles(role)
 
         await interaction.response.send_message(
-            f"📜 RU правила: <#{RU_RULES_CHANNEL_ID}>",
+            f"RU rules: <#{RU_RULES_CHANNEL_ID}>",
             ephemeral=True
         )
 
-    @discord.ui.button(label="🇬🇧 English", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="🇬🇧 EN", style=discord.ButtonStyle.success)
     async def en(self, interaction: discord.Interaction, button: discord.ui.Button):
 
         role = interaction.guild.get_role(EN_ROLE_ID)
@@ -117,31 +118,29 @@ class RulesView(discord.ui.View):
             await interaction.user.add_roles(role)
 
         await interaction.response.send_message(
-            f"📜 EN rules: <#{EN_RULES_CHANNEL_ID}>",
+            f"EN rules: <#{EN_RULES_CHANNEL_ID}>",
             ephemeral=True
         )
 
 # =====================
-# TICKET SYSTEM
+# TICKETS
 # =====================
 class CloseTicketView(discord.ui.View):
 
-    @discord.ui.button(label="🔒 Close ticket", style=discord.ButtonStyle.red)
+    @discord.ui.button(label="🔒 Close", style=discord.ButtonStyle.red)
     async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
 
         staff = interaction.guild.get_role(STAFF_ROLE_ID)
 
         if staff not in interaction.user.roles:
-            return await interaction.response.send_message(
-                "❌ Only staff can close tickets",
-                ephemeral=True
-            )
+            return await interaction.response.send_message("❌ Staff only", ephemeral=True)
 
-        await interaction.response.send_message("Closing ticket...")
+        await interaction.response.send_message("Closing...")
 
-        ch = interaction.guild.get_channel(TICKET_LOG_CHANNEL_ID)
-        if ch:
-            await ch.send(f"🔒 Closed: {interaction.channel.name} by {interaction.user}")
+        await ticket_log(
+            interaction.guild,
+            f"CLOSED | {interaction.channel.name} | by {interaction.user}"
+        )
 
         await interaction.channel.delete()
 
@@ -155,10 +154,7 @@ class TicketView(discord.ui.View):
 
         for ch in guild.channels:
             if ch.name == f"ticket-{user.id}":
-                return await interaction.response.send_message(
-                    "❌ You already have a ticket",
-                    ephemeral=True
-                )
+                return await interaction.response.send_message("Already have ticket", ephemeral=True)
 
         category = guild.get_channel(TICKET_CATEGORY_ID)
 
@@ -177,77 +173,72 @@ class TicketView(discord.ui.View):
             overwrites=overwrites
         )
 
+        staff_ping = staff.mention if staff else "STAFF"
+
         await channel.send(
-            f"🎫 Ticket opened by {user.mention}",
+            f"🎫 Ticket from {user.mention}\n{staff_ping}",
             view=CloseTicketView()
         )
 
-        logch = guild.get_channel(TICKET_LOG_CHANNEL_ID)
-        if logch:
-            await logch.send(f"🎫 Ticket opened: {channel.mention} by {user}")
+        await ticket_log(guild, f"CREATED | {user} | {channel.mention}")
 
         await interaction.response.send_message(
-            f"Created: {channel.mention}",
+            f"Created {channel.mention}",
             ephemeral=True
         )
 
 # =====================
+# MODERATION
+# =====================
+@tree.command(name="ban", guild=discord.Object(id=GUILD_ID))
+async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "no reason"):
+
+    await member.ban(reason=reason)
+    add_ban(member.id)
+
+    await log(interaction.guild, f"BAN | {member} | {reason}")
+    await interaction.response.send_message("banned", ephemeral=True)
+
+
+@tree.command(name="warn", guild=discord.Object(id=GUILD_ID))
+async def warn(interaction: discord.Interaction, member: discord.Member, reason: str = "no reason"):
+
+    add_warn(member.id)
+    s = get_stats(member.id)
+
+    await log(interaction.guild, f"WARN | {member} | {reason} | total {s[0]}")
+    await interaction.response.send_message(f"warned ({s[0]})", ephemeral=True)
+
+
+@tree.command(name="stats", guild=discord.Object(id=GUILD_ID))
+async def stats(interaction: discord.Interaction, member: discord.Member):
+
+    s = get_stats(member.id)
+
+    await interaction.response.send_message(
+        f"Stats:\nWarns: {s[0]}\nBans: {s[1]}\nMutes: {s[2]}",
+        ephemeral=True
+    )
+
+# =====================
+# READY
+# =====================
 @client.event
 async def on_ready():
-    print(f"Bot ready: {client.user}")
+    print(f"READY: {client.user}")
     await tree.sync(guild=discord.Object(id=GUILD_ID))
 
 # =====================
-# JOIN MESSAGE + RULES
+# JOIN
 # =====================
 @client.event
 async def on_member_join(member):
+
     ch = member.guild.system_channel
-
     if ch:
-        await ch.send(
-            "📜 Choose language / Выберите язык:",
-            view=RulesView()
-        )
+        await ch.send("Choose language:", view=RulesView())
 
 # =====================
-# ANTIFLOOD + LOG MSG
-# =====================
-@client.event
-async def on_message(message):
-    if message.author.bot:
-        return
-
-    now = time.time()
-    spam[message.author.id].append(now)
-    spam[message.author.id] = [t for t in spam[message.author.id] if now - t < 5]
-
-    if len(spam[message.author.id]) > 5:
-        await message.delete()
-        await log(message.guild, f"FLOOD | {message.author}")
-        return
-
-    await log(message.guild, f"MSG | {message.author}: {message.content}")
-
-# =====================
-# RULES COMMAND
-# =====================
-@tree.command(name="rules", description="RU/EN rules", guild=discord.Object(id=GUILD_ID))
-async def rules(interaction: discord.Interaction):
-    await interaction.response.send_message(
-        "Choose language:",
-        view=RulesView()
-    )
-
-# =====================
-# TICKET COMMAND
-# =====================
-@tree.command(name="ticket", description="Support tickets", guild=discord.Object(id=GUILD_ID))
-async def ticket(interaction: discord.Interaction):
-    await interaction.response.send_message(
-        "🎫 Support:",
-        view=TicketView()
-    )
-
+# RUN
 # =====================
 client.run(TOKEN)
