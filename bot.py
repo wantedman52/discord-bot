@@ -2,10 +2,10 @@ import discord
 from discord import app_commands
 import os
 import asyncio
+import datetime
 
 TOKEN = os.getenv("TOKEN")
 GUILD_ID = 1431313547014701136
-
 
 intents = discord.Intents.default()
 intents.members = True
@@ -13,27 +13,30 @@ intents.members = True
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
-
 # =====================
 # TIME PARSER
 # =====================
 def parse_time(time_str: str):
-    unit = time_str[-1]
-    value = int(time_str[:-1])
+    try:
+        unit = time_str[-1]
+        value = int(time_str[:-1])
 
-    if unit == "s":
-        return value
-    if unit == "m":
-        return value * 60
-    if unit == "h":
-        return value * 3600
-    if unit == "d":
-        return value * 86400
+        if unit == "s":
+            return value
+        if unit == "m":
+            return value * 60
+        if unit == "h":
+            return value * 3600
+        if unit == "d":
+            return value * 86400
+    except:
+        return None
+
     return None
 
 
 # =====================
-# READY
+# READY + SYNC
 # =====================
 @client.event
 async def on_ready():
@@ -49,17 +52,15 @@ async def on_ready():
 
 
 # =====================
-# /help
+# HELP
 # =====================
 @tree.command(name="help", description="Команды", guild=discord.Object(id=GUILD_ID))
 async def help_cmd(interaction: discord.Interaction):
-    await interaction.response.send_message(
-        "/help /ban /mute /warn"
-    )
+    await interaction.response.send_message("/help /ban /mute /warn")
 
 
 # =====================
-# /mute (TIME)
+# MUTE (TIME)
 # =====================
 @tree.command(name="mute", description="Мут с временем", guild=discord.Object(id=GUILD_ID))
 @app_commands.default_permissions(moderate_members=True)
@@ -68,13 +69,12 @@ async def mute(interaction: discord.Interaction, member: discord.Member, time: s
     seconds = parse_time(time)
 
     if not seconds:
-        await interaction.response.send_message("❌ Используй: 10m / 1h / 1d")
+        await interaction.response.send_message("❌ Используй формат: 10m / 1h / 1d")
         return
 
-    await member.timeout(
-        discord.utils.utcnow() + discord.timedelta(seconds=seconds),
-        reason=reason
-    )
+    until = discord.utils.utcnow() + datetime.timedelta(seconds=seconds)
+
+    await member.timeout(until, reason=reason)
 
     await interaction.response.send_message(
         f"🔇 {member.mention} замучен на {time}. Причина: {reason}"
@@ -82,23 +82,21 @@ async def mute(interaction: discord.Interaction, member: discord.Member, time: s
 
 
 # =====================
-# /ban (optional time = auto unban)
+# BAN
 # =====================
-@tree.command(name="ban", description="Бан с временем", guild=discord.Object(id=GUILD_ID))
+@tree.command(name="ban", description="Бан", guild=discord.Object(id=GUILD_ID))
 @app_commands.default_permissions(ban_members=True)
-async def ban(interaction: discord.Interaction, member: discord.Member, time: str = None, reason: str = "Без причины"):
+async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "Без причины"):
 
     await member.ban(reason=reason)
-    await interaction.response.send_message(f"🔨 {member} забанен. Причина: {reason}")
 
-    if time:
-        seconds = parse_time(time)
-        await asyncio.sleep(seconds)
-        await interaction.guild.unban(member)
+    await interaction.response.send_message(
+        f"🔨 {member} забанен. Причина: {reason}"
+    )
 
 
 # =====================
-# /warn
+# WARN
 # =====================
 warns = {}
 
@@ -114,6 +112,6 @@ async def warn(interaction: discord.Interaction, member: discord.Member, reason:
 
 
 # =====================
-# RUN
+# RUN BOT
 # =====================
 client.run(TOKEN)
